@@ -56,8 +56,8 @@ def export_to_sheets(headers, rows):
 
 if __name__ == "__main__":
     data = fetch_grafana_data()
-    table = data["results"]["A"]["frames"][0]
-    fields = [field["name"] for field in table["schema"]["fields"]]
-    values = list(zip(*[field["values"] for field in table["data"]["values"]]))
-    export_to_sheets(fields, values)
-    print(f"✅ Exported {len(values)} rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
+table = data["results"]["A"]["frames"][0]
+fields = [field["name"] for field in table["schema"]["fields"]]
+values = table["data"]["values"]
+export_to_sheets(fields, values)
+print(f"✅ Exported {len(values)} rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
