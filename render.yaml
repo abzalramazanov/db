@@ -2,9 +2,9 @@ services:
   - type: cron
     name: export-to-google-sheets
     runtime: python
-    schedule: "*/10 * * * *"  # Каждые 10 минут
+    schedule: "*/10 * * * *"
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python export_to_sheets.py"
+    startCommand: "python export_to_sheets.py"  # ✅ правильно, внутри блока
     envVars:
       - key: DB_HOST
         value: 172.16.88.11
