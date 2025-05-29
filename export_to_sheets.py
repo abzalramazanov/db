@@ -58,16 +58,12 @@ if __name__ == "__main__":
     data = fetch_grafana_data()
     table = data["results"]["A"]["frames"][0]
     fields = [field["name"] for field in table["schema"]["fields"]]
-    
+
     raw_values = table["data"]["values"]
-    rows = list(zip(*raw_values))  # трансформируем колонки → строки
+    rows = list(zip(*raw_values))  # 🔁 превращаем колонки → строки
+
     headers_with_index = ["№"] + fields
     rows_with_index = [[i + 1] + list(row) for i, row in enumerate(rows)]
-    
-    export_to_sheets(headers_with_index, rows_with_index)
-    print(f"✅ Exported {len(rows_with_index)} rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
-
-
 
     export_to_sheets(headers_with_index, rows_with_index)
     print(f"✅ Exported {len(rows_with_index)} rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
