@@ -1,0 +1,14 @@
+services:
+  - type: cron
+    name: grafana-to-gsheet
+    runtime: python
+    schedule: "*/10 * * * *"
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python export_to_sheets.py"
+    envVars:
+      - key: GRAFANA_API_KEY
+        sync: false  # не коммитится, будет задан вручную в Render UI
+      - key: GOOGLE_SHEET_NAME
+        value: grafana_export
+      - key: CREDENTIALS_FILE
+        value: credentials.json
