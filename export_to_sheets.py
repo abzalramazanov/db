@@ -19,14 +19,14 @@ def fetch_grafana_data(from_ts):
     }
     url = f"{GRAFANA_URL}/api/ds/query"
     raw_sql = f"""
-        select bin_iin,
+        SELECT bin_iin,
                full_name,
                phone_number,
                created
-        from users_client
-        where client_category_id is not null
-          and created > '{from_ts}'
-        order by created asc
+        FROM users_client
+        WHERE client_category_id IS NOT NULL
+          AND created > '{from_ts}'
+        ORDER BY created ASC
     """
     payload = {
         "queries": [
@@ -50,17 +50,16 @@ def fetch_grafana_data(from_ts):
 def get_last_created(sheet):
     values = sheet.get_all_values()
     if len(values) <= 1:
-        # если таблица пустая, вернуть начало мая
         return "2025-05-01 00:00:00"
     last_row = values[-1]
     try:
-        last_timestamp = int(last_row[-1])  # последний столбец — created
+        last_timestamp = int(last_row[-1])  # Последний столбец — created
         dt = datetime.fromtimestamp(last_timestamp / 1000)
         return dt.strftime("%Y-%m-%d %H:%M:%S")
     except:
         return "2025-05-01 00:00:00"
 
-def export_to_sheets(sheet, headers, rows):
+def export_to_sheets(sheet, rows):
     sheet.append_rows(rows, value_input_option="RAW")
 
 if __name__ == "__main__":
@@ -76,14 +75,13 @@ if __name__ == "__main__":
     # Забираем данные из Grafana
     data = fetch_grafana_data(from_ts)
     table = data["results"]["A"]["frames"][0]
-    fields = [field["name"] for field in table["schema"]["fields"]]
     raw_values = table["data"]["values"]
-    rows = list(zip(*raw_values))
-    rows_with_index = [[len(sheet.get_all_values()) + i] + list(row) for i, row in enumerate(rows)]
+    rows = list(zip(*raw_values))  # Транспонирование
+    rows_clean = [list(row) for row in rows]  # Без индексов и сдвигов
 
-    if rows_with_index:
-        export_to_sheets(sheet, rows_with_index[0:1], [])  # добавим заголовки, если нужно
-        export_to_sheets(sheet, rows_with_index, rows)
-        print(f"✅ Exported {len(rows)} rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
+    # Экспорт в Google Sheets
+    if rows_clean:
+        export_to_sheets(sheet, rows_clean)
+        print(f"✅ Exported {len(rows_clean)} rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
     else:
         print("⚠️ No new rows to export.")
