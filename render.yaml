@@ -2,7 +2,7 @@ services:
   - type: cron
     name: export-to-google-sheets
     runtime: python
-    schedule: "@hourly"
+    schedule: "*/10 * * * *"  # Каждые 10 минут
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python export_to_sheets.py"
     envVars:
