@@ -25,7 +25,7 @@ def fetch_grafana_data(from_ts):
                created
         FROM users_client
         WHERE client_category_id IS NOT NULL
-          AND created > '{from_ts}'
+          AND created >= '{from_ts}'
         ORDER BY created ASC
     """
     payload = {
@@ -53,7 +53,7 @@ def get_last_created(sheet):
         return "2025-05-01 00:00:00"
     last_row = values[-1]
     try:
-        last_timestamp = int(last_row[-1])  # Последний столбец — created
+        last_timestamp = int(last_row[-1])  # created — последний столбец
         dt = datetime.fromtimestamp(last_timestamp / 1000)
         return dt.strftime("%Y-%m-%d %H:%M:%S")
     except:
@@ -77,11 +77,14 @@ if __name__ == "__main__":
     table = data["results"]["A"]["frames"][0]
     raw_values = table["data"]["values"]
     rows = list(zip(*raw_values))  # Транспонирование
-    rows_clean = [list(row) for row in rows]  # Без индексов и сдвигов
+
+    # Убираем дубликаты на основе полного совпадения всех полей
+    existing_rows = set(tuple(row) for row in sheet.get_all_values()[1:])
+    rows_clean = [list(row) for row in rows if tuple(row) not in existing_rows]
 
     # Экспорт в Google Sheets
     if rows_clean:
         export_to_sheets(sheet, rows_clean)
-        print(f"✅ Exported {len(rows_clean)} rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
+        print(f"✅ Exported {len(rows_clean)} new rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
     else:
-        print("⚠️ No new rows to export.")
+        print("⚠️ No new unique rows to export.")
