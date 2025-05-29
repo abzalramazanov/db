@@ -4,7 +4,7 @@ services:
     runtime: python
     schedule: "*/10 * * * *"
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python export_to_sheets.py"  # ✅ правильно, внутри блока
+    startCommand: "python export_to_sheets.py"
     envVars:
       - key: DB_HOST
         value: 172.16.88.11
