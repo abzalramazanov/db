@@ -69,11 +69,18 @@ if __name__ == "__main__":
     client = gspread.authorize(creds)
     sheet = client.open(GOOGLE_SHEET_NAME).sheet1
 
-    # ✅ Проверка заголовков и автодобавление
+    # ✅ Устойчиво проверяем заголовки
     all_values = sheet.get_all_values()
-    if not all_values or len(all_values[0]) == 0 or all_values[0][0].lower() != "bin_iin":
+
+    header_ok = False
+    if all_values and isinstance(all_values[0], list):
+        first_row = all_values[0]
+        if len(first_row) > 0 and first_row[0].strip().lower() == "bin_iin":
+            header_ok = True
+
+    if not header_ok:
         sheet.insert_row(["bin_iin", "full_name", "phone_number", "created"], 1)
-        all_values = sheet.get_all_values()  # обновим
+        all_values = sheet.get_all_values()
 
     # Получаем последнюю дату created
     from_ts = get_last_created(sheet)
@@ -82,15 +89,13 @@ if __name__ == "__main__":
     data = fetch_grafana_data(from_ts)
     table = data["results"]["A"]["frames"][0]
     raw_values = table["data"]["values"]
-    rows = list(zip(*raw_values))
+    rows = list(zip(*raw_values))  # транспонирование
 
-    # Получим все bin_iin, которые уже есть
+    # Уникализируем по bin_iin
     existing_bin_iins = set(row[0] for row in all_values[1:] if len(row) > 0)
-
-    # Фильтруем: не добавляем повторяющиеся bin_iin
     rows_clean = [list(row) for row in rows if row[0] not in existing_bin_iins]
 
-    # Добавляем в Google Sheet
+    # Экспорт
     if rows_clean:
         export_to_sheets(sheet, rows_clean)
         print(f"✅ Exported {len(rows_clean)} new rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
