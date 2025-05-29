@@ -59,5 +59,10 @@ if __name__ == "__main__":
     table = data["results"]["A"]["frames"][0]
     fields = [field["name"] for field in table["schema"]["fields"]]
     values = table["data"]["values"]
-    export_to_sheets(fields, values)
-    print(f"✅ Exported {len(values)} rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
+
+    # 🪄 Добавим нумерацию и форматируем красиво
+    headers_with_index = ["№"] + fields
+    rows_with_index = [[i + 1] + list(row) for i, row in enumerate(values)]
+
+    export_to_sheets(headers_with_index, rows_with_index)
+    print(f"✅ Exported {len(rows_with_index)} rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
