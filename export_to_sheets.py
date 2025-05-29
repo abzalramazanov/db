@@ -3,13 +3,13 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 import os
 
-# Конфигурация Grafana
+# 🔧 Конфигурация Grafana
 GRAFANA_URL = "https://grafana.payda.online"
 DASHBOARD_UID = "cenbdzt50mps0a"
 PANEL_ID = 1
 GRAFANA_API_KEY = os.getenv("GRAFANA_API_KEY")
 
-# Конфигурация Google Sheets
+# 🔧 Конфигурация Google Sheets
 GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "grafana_export")
 CREDENTIALS_FILE = os.getenv("CREDENTIALS_FILE", "credentials.json")
 
@@ -56,8 +56,8 @@ def export_to_sheets(headers, rows):
 
 if __name__ == "__main__":
     data = fetch_grafana_data()
-table = data["results"]["A"]["frames"][0]
-fields = [field["name"] for field in table["schema"]["fields"]]
-values = table["data"]["values"]
-export_to_sheets(fields, values)
-print(f"✅ Exported {len(values)} rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
+    table = data["results"]["A"]["frames"][0]
+    fields = [field["name"] for field in table["schema"]["fields"]]
+    values = table["data"]["values"]
+    export_to_sheets(fields, values)
+    print(f"✅ Exported {len(values)} rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
