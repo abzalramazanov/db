@@ -53,7 +53,7 @@ def get_last_created(sheet):
         return "2025-05-01 00:00:00"
     last_row = values[-1]
     try:
-        last_timestamp = int(last_row[-1])  # created — последний столбец
+        last_timestamp = int(last_row[-1])
         dt = datetime.fromtimestamp(last_timestamp / 1000)
         return dt.strftime("%Y-%m-%d %H:%M:%S")
     except:
@@ -69,20 +69,28 @@ if __name__ == "__main__":
     client = gspread.authorize(creds)
     sheet = client.open(GOOGLE_SHEET_NAME).sheet1
 
+    # Проверим и добавим заголовки, если их нет
+    all_values = sheet.get_all_values()
+    if not all_values or all_values[0][0].lower() != "bin_iin":
+        sheet.insert_row(["bin_iin", "full_name", "phone_number", "created"], 1)
+        all_values = sheet.get_all_values()  # обновим
+
     # Получаем последнюю дату
     from_ts = get_last_created(sheet)
 
-    # Забираем данные из Grafana
+    # Получаем данные из Grafana
     data = fetch_grafana_data(from_ts)
     table = data["results"]["A"]["frames"][0]
     raw_values = table["data"]["values"]
-    rows = list(zip(*raw_values))  # Транспонирование
+    rows = list(zip(*raw_values))
 
-    # Убираем дубликаты на основе полного совпадения всех полей
-    existing_rows = set(tuple(row) for row in sheet.get_all_values()[1:])
-    rows_clean = [list(row) for row in rows if tuple(row) not in existing_rows]
+    # Получим уже существующие bin_iin
+    existing_bin_iins = set(row[0] for row in all_values[1:] if row)
 
-    # Экспорт в Google Sheets
+    # Фильтруем по уникальности bin_iin
+    rows_clean = [list(row) for row in rows if row[0] not in existing_bin_iins]
+
+    # Добавляем
     if rows_clean:
         export_to_sheets(sheet, rows_clean)
         print(f"✅ Exported {len(rows_clean)} new rows to Google Sheet '{GOOGLE_SHEET_NAME}'")
