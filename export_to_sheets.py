@@ -1,47 +1,56 @@
 import requests
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 import os
 import json
 import base64
 
-# 🧩 Восстановление credentials.json из ENV (если отсутствует)
+# 🧩 Восстановление credentials.json из ENV
 if not os.path.exists("credentials.json"):
     raw = os.getenv("CREDENTIALS_JSON")
     if raw:
         creds = json.loads(base64.b64decode(raw))
         with open("credentials.json", "w") as f:
             json.dump(creds, f)
+        print("🔐 credentials.json восстановлен из переменной окружения.")
     else:
-        raise ValueError("❌ CREDENTIALS_JSON not найден в окружении!")
+        raise ValueError("❌ CREDENTIALS_JSON не найден в окружении!")
 
-# 🔧 Конфигурация Grafana
+# 🔧 Конфигурация
 GRAFANA_URL = "https://grafana.payda.online/api/ds/query"
 GRAFANA_API_KEY = os.getenv("GRAFANA_API_KEY")
-DATASOURCE_UID = "fdk6lqw39jgn4f"
+DATASOURCE_UID = "ce37vo70kfcaob"
+GOOGLE_SHEET_NAME = os.getenv("GOOGLE_SHEET_NAME", "grafana_export")
+META_SHEET_NAME = "Meta"
 
-# 🔧 Конфигурация Google Sheets
-GOOGLE_SHEET_ID = "1JeYJqv5q_S3CfC855Tl5xjP7nD5Fkw9jQXrVyvEXK1Y"
-SHEET_NAME = "uniqe drivers main"
-CREDENTIALS_FILE = "credentials.json"
-
-# 📡 Авторизация в Google Sheets
+# 🔐 Авторизация
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-credentials = ServiceAccountCredentials.from_json_keyfile_name(CREDENTIALS_FILE, scope)
+credentials = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
 client = gspread.authorize(credentials)
-sheet = client.open_by_key(GOOGLE_SHEET_ID).worksheet(SHEET_NAME)
+doc = client.open(GOOGLE_SHEET_NAME)
 
-# 🧹 Очистка таблицы
-sheet.clear()
+# 🔹 Листы
+try:
+    main_sheet = doc.worksheet(GOOGLE_SHEET_NAME)
+except gspread.exceptions.WorksheetNotFound:
+    main_sheet = doc.add_worksheet(title=GOOGLE_SHEET_NAME, rows="100", cols="20")
 
-# 📡 Получение данных с Grafana
+try:
+    meta_sheet = doc.worksheet(META_SHEET_NAME)
+except gspread.exceptions.WorksheetNotFound:
+    meta_sheet = doc.add_worksheet(title=META_SHEET_NAME, rows="10", cols="2")
+
+# 📅 Очистка таблицы
+main_sheet.clear()
+print("🧼 Главный лист очищен")
+
+# 📈 Запрос к Grafana
 headers = {
     "Authorization": f"Bearer {GRAFANA_API_KEY}",
     "Content-Type": "application/json"
 }
 
-# ⚠️ ВАЖНО: Замени rawSql на твой актуальный запрос (если не работает)
 payload = {
     "queries": [
         {
@@ -50,7 +59,29 @@ payload = {
                 "uid": DATASOURCE_UID,
                 "type": "postgres"
             },
-            "rawSql": "SELECT name, tin, phone, park_full_name, COALESCE(avr_status, 'n/a') as avr_status, COALESCE(esf_status, 'n/a') as esf_status FROM drivers_data WHERE document_date >= CURRENT_DATE - INTERVAL '30 days'",
+            "rawSql": """
+                SELECT DISTINCT ON (sub.tin)
+                       sub.name AS \"Имя\",
+                       sub.phone AS \"Телефон\",
+                       sub.tin AS \"ИНН\"
+                FROM (
+                  SELECT a.seller_name AS name,
+                         a.seller_tin  AS tin,
+                         a.seller_phone AS phone
+                  FROM awps a
+                  WHERE a.document_date >= '2025-05-01'
+                    AND a.buyer_name = 'ТОО \"Яндекс.Такси Корп\"'
+
+                  UNION ALL
+
+                  SELECT a.buyer_name,
+                         a.buyer_tin,
+                         a.buyer_phone
+                  FROM awps a
+                  WHERE a.document_date >= '2025-05-01'
+                    AND a.seller_name = 'ТОО \"Яндекс.Такси Корп\"'
+                ) sub
+            """,
             "format": "table"
         }
     ],
@@ -61,16 +92,27 @@ payload = {
 }
 
 response = requests.post(GRAFANA_URL, headers=headers, json=payload)
+response.raise_for_status()
 data = response.json()
 
-# 📤 Парсинг и загрузка в таблицу
-rows = data['results']['A']['frames'][0]['data']
-fields = rows['fields']
-headers_row = [field['name'] for field in fields]
-sheet.append_row(headers_row)
+# 📄 Парсинг ответа
+try:
+    rows = data['results']['A']['frames'][0]['data']
+    fields = rows['fields']
+    headers_row = [field['name'] for field in fields]
+    values = list(zip(*[f['values'] for f in fields]))
+    table_data = [headers_row] + list(values)
+except Exception as e:
+    print(f"❌ Ошибка парсинга данных из Grafana: {e}")
+    print(json.dumps(data, indent=2))
+    raise
 
-values = list(zip(*[f['values'] for f in fields]))
-for row in values:
-    sheet.append_row(list(row))
+# ⬆️ Загрузка в таблицу
+main_sheet.update("A1", table_data)
+print(f"📄 Загружено строк: {len(table_data) - 1}")
 
-print(f"[{datetime.now()}] ✅ Данные успешно загружены в Google Таблицу.")
+# ⏰ Обновление мета-листа
+now_kz = datetime.now(timezone.utc) + timedelta(hours=5)
+now_str = now_kz.strftime("%Y-%m-%d %H:%M:%S")
+meta_sheet.update("A1", [[now_str]])
+print(f"🕒 Время обновления: {now_str}")
